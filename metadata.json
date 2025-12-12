@@ -1,0 +1,5 @@
+{
+  "name": "Netflix AI",
+  "description": "A premium streaming service clone featuring real-time AI-powered movie recommendations, immersive UI animations, and a rich library of titles.",
+  "requestFramePermissions": []
+}

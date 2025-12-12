@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Netflix AI - Watch TV Shows Online, Watch Movies Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
+      }
+    }
+    </script>
+    <style>
+      body {
+        background-color: #141414;
+        color: white;
+        font-family: 'Inter', sans-serif;
+        overflow-x: hidden;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+      .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+      .aspect-video-poster {
+        aspect-ratio: 2/3;
+      }
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.3s ease-out forwards;
+      }
+      .hero-slide {
+        transition: opacity 1.5s ease-in-out;
+        opacity: 0;
+        z-index: 0;
+      }
+      .hero-slide.active {
+        opacity: 1;
+        z-index: 1;
+      }
+      .landing-bg {
+        background-image: url('https://assets.nflxext.com/ffe/siteui/vlv3/5e16108c-fd30-46de-9bb8-0b4e1bbbc509/29d8d7d7-83cc-4b5f-aa9b-6fd4f68b569c/US-en-20240205-popsignuptwoweeks-perspective_alpha_website_large.jpg');
+        background-size: cover;
+        background-position: center;
+      }
+    </style>
+  </head>
+  <body class="antialiased">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-24 right-5 z-[100] bg-white text-black px-6 py-3 rounded shadow-xl transform translate-x-full transition-transform duration-300 flex items-center gap-2 font-bold">
+      <i data-lucide="check-circle" class="text-green-600"></i>
+      <span id="toast-message">Notification</span>
+    </div>
+    
+    <!-- Landing Page (Sign In) -->
+    <div id="landing-page" class="fixed inset-0 z-[100] bg-black text-white overflow-y-auto">
+       <div class="landing-bg absolute inset-0 opacity-50"></div>
+       <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/80"></div>
+       <div class="absolute inset-0 bg-black/40"></div>
+
+       <div class="relative z-10 px-4 md:px-12 py-6 flex justify-between items-center">
+          <div class="text-red-600 font-bold text-4xl md:text-5xl tracking-tighter">NETFLIX</div>
+          <button onclick="handleLogin()" class="bg-red-600 text-white px-4 py-1.5 rounded font-medium hover:bg-red-700 transition">Sign In</button>
+       </div>
+
+       <div class="relative z-10 flex flex-col items-center justify-center min-h-[80vh] text-center px-4">
+          <h1 class="text-4xl md:text-6xl font-black max-w-4xl mb-4 drop-shadow-2xl">Unlimited movies, TV shows, and more</h1>
+          <p class="text-xl md:text-2xl font-medium mb-6 drop-shadow-md">Watch anywhere. Cancel anytime.</p>
+          <p class="text-lg md:text-xl mb-4 drop-shadow-md">Ready to watch? Enter your email to create or restart your membership.</p>
+          
+          <div class="flex flex-col md:flex-row gap-4 w-full max-w-2xl">
+             <input type="email" value="user@example.com" placeholder="Email address" class="flex-1 bg-black/60 border border-gray-500 rounded p-4 text-white placeholder-gray-400 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/50 backdrop-blur-sm" />
+             <button onclick="handleLogin()" class="bg-red-600 text-white px-8 py-3 rounded text-xl font-bold hover:bg-red-700 transition flex items-center justify-center gap-2">
+                Get Started <i data-lucide="chevron-right"></i>
+             </button>
+          </div>
+       </div>
+    </div>
+
+    <!-- Main Application (Hidden initially) -->
+    <div id="app-page" class="hidden">
+      
+      <!-- Navbar -->
+      <nav id="navbar" class="fixed w-full top-0 z-50 transition-all duration-500 bg-gradient-to-b from-black/70 to-transparent">
+        <div class="px-4 md:px-12 py-4 flex items-center justify-between">
+          <div class="flex items-center gap-8">
+            <div class="text-red-600 font-bold text-2xl md:text-3xl tracking-tighter cursor-pointer" onclick="navigateTo('home')">NETFLIX</div>
+            <ul class="hidden md:flex gap-6 text-sm text-gray-200">
+              <li onclick="navigateTo('home')" class="nav-link font-medium cursor-pointer hover:text-gray-400 transition text-white">Home</li>
+              <li onclick="navigateTo('series')" class="nav-link cursor-pointer hover:text-gray-400 transition">Series</li>
+              <li onclick="navigateTo('movies')" class="nav-link cursor-pointer hover:text-gray-400 transition">Films</li>
+              <li onclick="navigateTo('new')" class="nav-link cursor-pointer hover:text-gray-400 transition">New & Popular</li>
+              <li onclick="navigateTo('list')" class="nav-link cursor-pointer hover:text-gray-400 transition">My List</li>
+            </ul>
+          </div>
+          <div class="flex items-center gap-6 text-white">
+            <button onclick="openSearch()" class="hidden md:flex items-center gap-2 hover:bg-neutral-800 px-3 py-1 rounded-full transition group">
+              <span class="text-xs font-semibold text-gray-300 group-hover:text-white">ASK AI</span>
+              <i data-lucide="search" class="w-5 h-5"></i>
+            </button>
+            <i data-lucide="search" onclick="openSearch()" class="w-5 h-5 md:hidden cursor-pointer"></i>
+            <i data-lucide="gift" class="w-5 h-5 cursor-pointer hover:text-gray-300 hidden sm:block"></i>
+            <i data-lucide="bell" class="w-5 h-5 cursor-pointer hover:text-gray-300"></i>
+            <div class="flex items-center gap-2 cursor-pointer group">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png" alt="Profile" class="w-8 h-8 rounded-md" />
+            </div>
+             <div class="md:hidden cursor-pointer" onclick="toggleMobileMenu()">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+             </div>
+          </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden absolute top-16 left-0 w-full bg-neutral-900 border-t border-gray-800 flex flex-col p-4 text-center animate-fade-in md:hidden">
+            <div onclick="navigateTo('home')" class="py-3 hover:bg-neutral-800 rounded text-white">Home</div>
+            <div onclick="navigateTo('series')" class="py-3 hover:bg-neutral-800 rounded text-white">Series</div>
+            <div onclick="navigateTo('movies')" class="py-3 hover:bg-neutral-800 rounded text-white">Films</div>
+            <div onclick="navigateTo('new')" class="py-3 hover:bg-neutral-800 rounded text-white">New & Popular</div>
+            <div onclick="navigateTo('list')" class="py-3 hover:bg-neutral-800 rounded text-white">My List</div>
+            <div onclick="openSearch()" class="py-3 hover:bg-neutral-800 rounded text-red-500 font-bold flex justify-center items-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> Ask AI</div>
+        </div>
+      </nav>
+
+      <!-- Hero Section (Visible on Home, Series, Movies) -->
+      <header id="hero" class="relative h-[85vh] w-full text-white overflow-hidden group">
+        <!-- Slides injected via JS -->
+      </header>
+
+      <!-- Main Content Rows -->
+      <main id="main-content" class="relative z-10 -mt-24 md:-mt-48 pb-20 min-h-[50vh]">
+        <!-- Rows injected via JS -->
+      </main>
+
+      <!-- Footer -->
+      <footer class="px-12 py-8 text-gray-500 text-sm bg-black/90 mt-12 border-t border-neutral-800">
+          <div class="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+             <div class="space-y-2">
+               <p class="hover:underline cursor-pointer">Audio Description</p>
+               <p class="hover:underline cursor-pointer">Investor Relations</p>
+               <p class="hover:underline cursor-pointer">Legal Notices</p>
+             </div>
+             <div class="space-y-2">
+               <p class="hover:underline cursor-pointer">Help Center</p>
+               <p class="hover:underline cursor-pointer">Jobs</p>
+               <p class="hover:underline cursor-pointer">Cookie Preferences</p>
+             </div>
+             <div class="space-y-2">
+               <p class="hover:underline cursor-pointer">Gift Cards</p>
+               <p class="hover:underline cursor-pointer">Terms of Use</p>
+               <p class="hover:underline cursor-pointer">Corporate Information</p>
+             </div>
+             <div class="space-y-2">
+               <p class="hover:underline cursor-pointer">Media Center</p>
+               <p class="hover:underline cursor-pointer">Privacy</p>
+               <p class="hover:underline cursor-pointer">Contact Us</p>
+             </div>
+          </div>
+          <div class="max-w-4xl mx-auto mt-8 text-center text-xs">
+            © 2024 Netflix AI Clone. Educational Demo.
+          </div>
+      </footer>
+    </div>
+
+    <!-- Search Modal -->
+    <div id="search-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+       <div class="bg-neutral-900 w-full max-w-4xl rounded-xl border border-neutral-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div class="p-6 border-b border-neutral-800 flex items-center justify-between bg-gradient-to-r from-red-900/20 to-neutral-900">
+             <div class="flex items-center gap-3">
+               <div class="bg-red-600 p-2 rounded-lg">
+                  <i data-lucide="sparkles" class="text-white w-5 h-5"></i>
+               </div>
+               <div>
+                  <h2 class="text-xl font-bold text-white">AI Assistant</h2>
+                  <p class="text-xs text-gray-400">Powered by Gemini 2.5</p>
+               </div>
+             </div>
+             <button onclick="closeSearch()" class="text-gray-400 hover:text-white transition">
+               <i data-lucide="x" class="w-6 h-6"></i>
+             </button>
+          </div>
+          
+          <div id="search-results" class="flex-1 overflow-y-auto p-6 min-h-[300px]">
+             <div class="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-50">
+                <i data-lucide="sparkles" class="w-16 h-16 text-gray-600"></i>
+                <p class="text-xl font-medium text-gray-300">"Find me 90s sci-fi movies that are scary"</p>
+             </div>
+          </div>
+
+          <div class="p-4 border-t border-neutral-800 bg-neutral-900">
+             <form onsubmit="handleSearchSubmit(event)" class="relative">
+               <input id="search-input" type="text" placeholder="Ask for a recommendation..." class="w-full bg-neutral-800 text-white pl-4 pr-12 py-4 rounded-full focus:outline-none focus:ring-2 focus:ring-red-600 placeholder-gray-500">
+               <button type="submit" class="absolute right-2 top-2 bottom-2 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition">
+                 <i data-lucide="send" class="w-5 h-5"></i>
+               </button>
+             </form>
+          </div>
+       </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div id="video-modal" class="hidden fixed inset-0 z-[70] bg-black flex flex-col animate-fade-in">
+       <div class="absolute top-0 w-full p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/80 to-transparent">
+          <h2 id="video-title" class="text-xl font-bold text-white">Playing Movie</h2>
+          <button onclick="closeVideo()" class="text-white hover:text-gray-300">
+             <i data-lucide="x" class="w-8 h-8"></i>
+          </button>
+       </div>
+       <div class="flex-1 flex items-center justify-center relative">
+          <!-- Simulated Video Player -->
+          <div class="w-full h-full flex flex-col items-center justify-center bg-neutral-900">
+             <div class="animate-pulse absolute inset-0 bg-gradient-to-r from-neutral-800 to-neutral-900"></div>
+             <i data-lucide="play-circle" class="w-24 h-24 text-red-600 z-10 opacity-50"></i>
+             <p class="mt-4 text-gray-400 z-10">Simulating Video Playback...</p>
+             <div class="w-full absolute bottom-10 px-12 z-20">
+                <div class="w-full bg-gray-700 h-1 rounded-full overflow-hidden">
+                   <div class="bg-red-600 h-full w-[35%]"></div>
+                </div>
+                <div class="flex justify-between mt-2 text-sm text-gray-400">
+                   <span>12:34</span>
+                   <span>1:45:20</span>
+                </div>
+             </div>
+          </div>
+       </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="details-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+      <div class="relative bg-[#181818] w-full max-w-4xl rounded-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar">
+         <button onclick="closeDetails()" class="absolute top-4 right-4 z-20 bg-[#181818] p-2 rounded-full hover:bg-neutral-700 transition">
+           <i data-lucide="x" class="w-6 h-6 text-white"></i>
+         </button>
+         <div id="details-content">
+            <!-- Dynamic Content -->
+         </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { GoogleGenAI, Type } from "@google/genai";
+
+      // --- Constants & Data ---
+      const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
+      
+      const STATIC_MOVIES = [
+        // TV Series
+        { id: 1, title: "Stranger Things", type: 'tv', overview: "When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces, and one strange little girl.", poster_path: "/49WJfeN0moxb9IPfGn8AIqMGskD.jpg", backdrop_path: "/56v2KjBlU4XaOv9rVYkJu64HIIV.jpg", matchScore: 99, genre_ids: [18, 9648, 10765], year: "2016" },
+        { id: 2, title: "Wednesday", type: 'tv', overview: "Smart, sarcastic and a little dead inside, Wednesday Addams investigates a murder spree while making new friends — and foes — at Nevermore Academy.", poster_path: "/9PFonBhy4cQy7Jz20NpMygczOkv.jpg", backdrop_path: "/iHSwvRVsRyxpX7FE7GbviaDvgGZ.jpg", matchScore: 97, genre_ids: [10765, 9648, 35], year: "2022" },
+        { id: 3, title: "The Witcher", type: 'tv', overview: "Geralt of Rivia, a mutated monster-hunter for hire, journeys toward his destiny in a turbulent world where people often prove more wicked than beasts.", poster_path: "/cRLz8AmjR2D6X5U056aX3Wz2dJg.jpg", backdrop_path: "/jBJWaqoSCiARWtfV0GlqHrcdidd.jpg", matchScore: 95, genre_ids: [10765, 18, 10759], year: "2019" },
+        { id: 5, title: "Breaking Bad", type: 'tv', overview: "When Walter White, a New Mexico chemistry teacher, is diagnosed with Stage III cancer and given a prognosis of two years left to live. He becomes filled with a sense of fearlessness and an unrelenting desire to secure his family's financial future at any cost.", poster_path: "/ggFHVNu6YYI5L9pCfOacjizRGt.jpg", backdrop_path: "/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg", matchScore: 99, genre_ids: [18], year: "2008" },
+        { id: 11, title: "Squid Game", type: 'tv', overview: "Hundreds of cash-strapped players accept a strange invitation to compete in children's games. Inside, a tempting prize awaits with deadly high stakes. A survival game that has a whooping 45.6 billion-won prize at stake.", poster_path: "/dDlEmu3EZ0Pgg93K2SVNLCjCSvE.jpg", backdrop_path: "/2meX1nMdScFOoV4370rqHWKmXhY.jpg", matchScore: 96, genre_ids: [10759, 9648, 18], year: "2021" },
+        { id: 12, title: "The Queen's Gambit", type: 'tv', overview: "In a 1950s orphanage, a young girl reveals an astonishing talent for chess and begins an unlikely journey to stardom while grappling with addiction.", poster_path: "/zU0htwkhnGbqCV2nAB8ik4fP4oF.jpg", backdrop_path: "/34OGjFEbHj0E3lE2w0iTUVq00y.
